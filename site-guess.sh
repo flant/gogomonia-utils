@@ -14,16 +14,21 @@ main() {
   parse_args "$@" || (usage && exit 1)
 
   if [ -z "$SITE" ] ; then
-    echo -e "SITENAME is required!\n\n" && usage && exit 1
+    echo -e "Error: SITENAME is required!\n" && usage && exit 1
   fi
 
-#  exit 1
-
+  # first pass
   site_guess
+  # second pass if main page redirects to another domain
+  if [[ $SITE_IS_ALIAS == "yes" ]] ; then
+    SITE_ALIAS=$SITE
+    SITE=$REDIR_DOMAIN
+    site_guess
+  fi
 }
 
 usage() {
-printf " Usage: $0 SITENAME
+printf "Usage: $0 SITENAME
 
     SITENAME
             Site domain for testing
@@ -38,10 +43,6 @@ parse_args() {
     case "$1" in
       --help|-h)
         return 1
-        ;;
-      --alias)
-        ALIAS="$2"
-        shift
         ;;
       --*)
         echo "Illegal option $1"
@@ -61,7 +62,6 @@ site_guess() {
 
   AUTO_MAIN=yes
   AUTO_HTTPS=no
-  REDIRECT_ALIAS=
   CHECK_REDIRECTS_FROM_RND=
 
 
@@ -101,14 +101,10 @@ site_guess() {
       else
         AUTO_MAIN="false"
         if [[ $REDIR_DOMAIN != $SITE ]] ; then
-          # $AUTO_ALIAS=$SITE
           msg "    http перенаправляет на другой домен: ${REDIR_DOMAIN}"
           msg "    Нужно описывать сайт ${REDIR_DOMAIN}, а ${SITE} добавить в redirectAliases"
-          if [[ $ALIAS == "" ]] ; then
-            ./$0 --alias $SITE $REDIR_DOMAIN
-            exit 0
-          fi
           SITE_IS_ALIAS=yes
+          return
         else
           msg "    Такое перенаправление не поддерживается автопроверками,"
           msg "    нужно описать тесты специально для этого сайта."
@@ -166,6 +162,7 @@ site_guess() {
         msg "    https перенаправляет на другой домен: ${REDIR_DOMAIN}"
         msg "    Нужно описывать сайт ${REDIR_DOMAIN}, а ${SITE} добавить в redirectAliases"
         SITE_IS_ALIAS=yes
+        return
       else
         msg "    Такое перенаправление не поддерживается автопроверками,"
         msg "    нужно описать тесты специально для этого сайта."
@@ -185,9 +182,9 @@ site_guess() {
 
   msg "sites:"
   msg "- site: $SITE"
-  if [[ $ALIAS != "" ]] ; then
+  if [[ $SITE_ALIAS != "" ]] ; then
     msg "  redirectAliases:"
-    msg "  - $ALIAS"
+    msg "  - $SITE_ALIAS"
   fi
   msg "  auto:"
   msg "    mainPage: $AUTO_MAIN"
